@@ -1,0 +1,37 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.natantec.tvspecs'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.natantec.tvspecs'
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    // O lint não deve barrar o APK (ex.: avisos sobre targetSdk virando erro).
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // Assinado com a chave de debug para poder instalar direto na TV (sideload).
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    // App sem nenhuma dependência externa de propósito: leve para TVs com 1 GB de RAM.
+}

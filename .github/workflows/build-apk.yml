@@ -1,0 +1,62 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Instalar o Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Instalar o Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Compilar o APK
+        run: gradle --no-daemon --stacktrace assembleRelease
+
+      - name: Preparar o arquivo do APK
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk dist/TVSpecs.apk
+          ls -la dist
+
+      - name: Guardar o APK como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: TVSpecs-apk
+          path: dist/TVSpecs.apk
+
+      - name: Atualizar a tag "latest"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f latest
+          git push -f origin latest
+
+      - name: Publicar o APK na página de Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: TV Specs (versão mais recente)
+          body: |
+            APK pronto para instalar na TV.
+
+            Link direto para baixar (serve para o app Downloader):
+            https://github.com/${{ github.repository }}/releases/latest/download/TVSpecs.apk
+          files: dist/TVSpecs.apk

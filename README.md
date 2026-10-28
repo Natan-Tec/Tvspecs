@@ -21,6 +21,15 @@ Feito para TVs fracas (testado em mente para 1 GB de RAM): não usa nenhuma bibl
 | **Propriedades** | Todas as propriedades do `getprop` |
 | **Relatório** | Salva um `.txt` completo na pasta Download |
 
+## TV ou celular (v1.1)
+
+O app detecta sozinho o aparelho:
+
+- **TV:** tela horizontal, menu lateral e controle remoto (como antes).
+- **Celular/tablet:** tela sempre na vertical, abas rolando no topo e lista em tela cheia, com toque.
+
+**Próxima atualização:** overlay flutuante (só celular) com temperatura, FPS, uso de CPU, GPU e RAM. A base já está pronta em `OverlayData` e `OverlayController`.
+
 ## Como usar no controle remoto
 
 - **◀ ▶** alterna entre o menu e o conteúdo

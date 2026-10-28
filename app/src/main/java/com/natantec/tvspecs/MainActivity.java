@@ -13,7 +13,9 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.content.pm.ActivityInfo;
 import android.widget.AdapterView;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ScrollView;
@@ -47,6 +49,7 @@ public class MainActivity extends Activity implements Pages.Host {
     private TextView clockView;
     private TextView uptimeView;
     private int current = 0;
+    private boolean tvMode;
 
     private final Runnable refreshRun = new Runnable() {
         @Override
@@ -59,6 +62,10 @@ public class MainActivity extends Activity implements Pages.Host {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        tvMode = Device.isTv(this);
+        // TV: horizontal como sempre. Celular: sempre em pé.
+        setRequestedOrientation(tvMode ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         pages = new Pages(this, store, this);
         sampler = new Sampler(this, store, new Sampler.Listener() {
@@ -68,9 +75,9 @@ public class MainActivity extends Activity implements Pages.Host {
             }
         });
 
-        setContentView(buildUi());
+        setContentView(tvMode ? buildUi() : buildMobileUi());
         showPage(0);
-        menuItems[0].requestFocus();
+        if (tvMode) menuItems[0].requestFocus();
 
         // Informações pesadas (getprop, GPU, codecs, DRM) carregam em segundo plano.
         new Thread(new Runnable() {
@@ -232,6 +239,93 @@ public class MainActivity extends Activity implements Pages.Host {
         return root;
     }
 
+    /** Layout de celular: vertical, abas rolando na horizontal no topo e lista em tela cheia. */
+    private View buildMobileUi() {
+        final int matchP = ViewGroup.LayoutParams.MATCH_PARENT;
+        final int wrapC = ViewGroup.LayoutParams.WRAP_CONTENT;
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Ui.BG);
+        root.setPadding(Ui.dp(this, 14), Ui.dp(this, 14), Ui.dp(this, 14), Ui.dp(this, 8));
+
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout titleBox = new LinearLayout(this);
+        titleBox.setOrientation(LinearLayout.VERTICAL);
+        TextView title = label(22, Ui.ACCENT, true);
+        title.setText("Specs");
+        titleBox.addView(title);
+        TextView sub = label(12, Ui.MUTED, false);
+        sub.setText(Sys.cap(android.os.Build.MANUFACTURER) + " " + android.os.Build.MODEL
+                + " • Android " + android.os.Build.VERSION.RELEASE);
+        sub.setSingleLine(true);
+        titleBox.addView(sub);
+        head.addView(titleBox, new LinearLayout.LayoutParams(0, wrapC, 1f));
+        LinearLayout right = new LinearLayout(this);
+        right.setOrientation(LinearLayout.VERTICAL);
+        clockView = label(18, Ui.TEXT, true);
+        clockView.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        clockView.setGravity(Gravity.END);
+        uptimeView = label(11, Ui.MUTED, false);
+        uptimeView.setGravity(Gravity.END);
+        right.addView(clockView);
+        right.addView(uptimeView);
+        head.addView(right, new LinearLayout.LayoutParams(wrapC, wrapC));
+        root.addView(head, new LinearLayout.LayoutParams(matchP, wrapC));
+
+        // abas
+        HorizontalScrollView tabs = new HorizontalScrollView(this);
+        tabs.setHorizontalScrollBarEnabled(false);
+        menuBox = new LinearLayout(this);
+        menuBox.setOrientation(LinearLayout.HORIZONTAL);
+        tabs.addView(menuBox, new ViewGroup.LayoutParams(wrapC, wrapC));
+        menuItems = new TextView[Pages.COUNT];
+        for (int i = 0; i < Pages.COUNT; i++) {
+            final int idx = i;
+            TextView t = label(15, Ui.TEXT, false);
+            t.setText(Pages.TITLES[i]);
+            t.setGravity(Gravity.CENTER);
+            t.setSingleLine(true);
+            t.setPadding(Ui.dp(this, 14), Ui.dp(this, 9), Ui.dp(this, 14), Ui.dp(this, 9));
+            t.setClickable(true);
+            t.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showPage(idx);
+                }
+            });
+            menuItems[i] = t;
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(wrapC, wrapC);
+            lp.rightMargin = Ui.dp(this, 6);
+            menuBox.addView(t, lp);
+        }
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(matchP, wrapC);
+        tp.topMargin = Ui.dp(this, 10);
+        root.addView(tabs, tp);
+
+        content = new ListView(this);
+        adapter = new RowAdapter(this);
+        content.setAdapter(adapter);
+        content.setSelector(new ColorDrawable(0x224FC3F7));
+        content.setDivider(new ColorDrawable(0x12FFFFFF));
+        content.setDividerHeight(1);
+        content.setCacheColorHint(Color.TRANSPARENT);
+        content.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        content.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                Row r = adapter.row(position);
+                if (r.action != null) r.action.run();
+            }
+        });
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(matchP, 0, 1f);
+        cp.topMargin = Ui.dp(this, 8);
+        root.addView(content, cp);
+        return root;
+    }
+
     private void styleMenu() {
         for (int i = 0; i < menuItems.length; i++) {
             TextView t = menuItems[i];
@@ -260,6 +354,8 @@ public class MainActivity extends Activity implements Pages.Host {
     private void showPage(int idx) {
         current = idx;
         styleMenu();
+        if (!tvMode) menuItems[idx].getParent().requestChildRectangleOnScreen(menuItems[idx],
+                new android.graphics.Rect(0, 0, menuItems[idx].getWidth(), menuItems[idx].getHeight()), false);
         adapter.set(getRows(idx));
         content.setSelection(0);
     }
@@ -293,7 +389,7 @@ public class MainActivity extends Activity implements Pages.Host {
 
     @Override
     public void onBackPressed() {
-        if (content.hasFocus()) {
+        if (tvMode && content.hasFocus()) {
             menuItems[current].requestFocus();
         } else {
             super.onBackPressed();

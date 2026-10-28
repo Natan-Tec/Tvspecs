@@ -28,7 +28,12 @@ jobs:
           gradle-version: '8.9'
 
       - name: Compilar o APK
-        run: gradle --no-daemon --stacktrace assembleRelease
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace assembleRelease 2>&1 | tee build.log || {
+            echo "::error title=Erro de compilação::$(grep -E 'error:|FAILED|What went wrong' -A2 build.log | head -12 | tr '\n' ' ')"
+            exit 1
+          }
 
       - name: Preparar o arquivo do APK
         run: |
